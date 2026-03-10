@@ -56,7 +56,8 @@ Examples:
   ./zeroclaw_install.sh --install-system-deps --install-rust
   ./zeroclaw_install.sh --prefer-prebuilt
   ./zeroclaw_install.sh --prebuilt-only
-  ./zeroclaw_install.sh --onboard --api-key "sk-..." --provider openrouter [--model "openrouter/auto"]
+  ./zeroclaw_install.sh --onboard --api-key "sk-..." --provider openrouter
+  ./zeroclaw_install.sh --onboard --api-key "sk-..." --provider openrouter --model "openrouter/auto"
   ./zeroclaw_install.sh --interactive-onboard
   ./zeroclaw_install.sh --docker --docker-config ./config.toml --docker-daemon
 
