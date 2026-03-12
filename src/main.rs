@@ -119,6 +119,19 @@ async fn main() -> Result<()> {
         .await
         .context("Failed to load Augusta config")?;
 
+    // Check macOS permissions for desktop automation
+    #[cfg(target_os = "macos")]
+    {
+        let perms = lightwave_macos::permission::check_permissions();
+        if !perms.all_granted() {
+            for missing in perms.missing_permissions() {
+                eprintln!("Warning: Missing permission — {missing}");
+            }
+            eprintln!("Some desktop automation features will be unavailable.");
+            eprintln!();
+        }
+    }
+
     match cli.command {
         Commands::Agent {
             message,

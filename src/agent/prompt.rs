@@ -452,7 +452,7 @@ mod tests {
                 args: std::collections::HashMap::new(),
             }],
             prompts: vec!["Run smoke tests before deploy.".into()],
-            location: Some(Path::new("/tmp/workspace/skills/deploy/SKILL.md").to_path_buf()),
+            location: Some("/tmp/workspace/skills/deploy/SKILL.md".to_string()),
         }];
 
         let ctx = PromptContext {

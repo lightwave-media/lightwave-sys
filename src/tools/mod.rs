@@ -122,10 +122,14 @@ pub fn all_tools(
         security,
         Arc::new(NativeRuntime::new()),
         memory,
+        None,
+        None,
         browser_config,
         http_config,
         web_fetch_config,
         workspace_dir,
+        &std::collections::HashMap::new(),
+        None,
         root_config,
     )
 }
@@ -137,10 +141,14 @@ pub fn all_tools_with_runtime(
     security: &Arc<SecurityPolicy>,
     runtime: Arc<dyn RuntimeAdapter>,
     memory: Arc<dyn Memory>,
+    _composio_key: Option<&str>,
+    _composio_entity_id: Option<&str>,
     browser_config: &crate::config::BrowserConfig,
     http_config: &crate::config::HttpRequestConfig,
     web_fetch_config: &crate::config::WebFetchConfig,
     workspace_dir: &std::path::Path,
+    _agents_config: &std::collections::HashMap<String, crate::config::DelegateAgentConfig>,
+    _api_key: Option<&str>,
     _root_config: &crate::config::Config,
 ) -> Vec<Box<dyn Tool>> {
     let mut tool_arcs: Vec<Arc<dyn Tool>> = vec![
@@ -207,15 +215,42 @@ pub fn all_tools_with_runtime(
     tool_arcs.push(Arc::new(ScreenshotTool::new(security.clone())));
     tool_arcs.push(Arc::new(ImageInfoTool::new(security.clone())));
 
-    // macOS desktop tools — will be registered when lightwave-macos crate is built
-    // #[cfg(target_os = "macos")]
-    // {
-    //     if let Ok(mac_tool) = lightwave_macos::MacDesktopTool::new(security.clone()) {
-    //         tool_arcs.push(Arc::new(mac_tool));
-    //     }
-    // }
+    // macOS desktop tools
+    #[cfg(target_os = "macos")]
+    {
+        tool_arcs.push(Arc::new(MacDesktopToolWrapper));
+    }
 
     boxed_registry_from_arcs(tool_arcs)
+}
+
+/// Wrapper around lightwave_macos to implement the Tool trait.
+#[cfg(target_os = "macos")]
+struct MacDesktopToolWrapper;
+
+#[cfg(target_os = "macos")]
+#[async_trait]
+impl Tool for MacDesktopToolWrapper {
+    fn name(&self) -> &str {
+        lightwave_macos::TOOL_NAME
+    }
+
+    fn description(&self) -> &str {
+        lightwave_macos::TOOL_DESCRIPTION
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        lightwave_macos::parameters_schema()
+    }
+
+    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        let result = lightwave_macos::execute(&args);
+        Ok(ToolResult {
+            success: result.success,
+            output: result.output,
+            error: result.error,
+        })
+    }
 }
 
 #[cfg(test)]

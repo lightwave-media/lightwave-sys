@@ -35,23 +35,71 @@ pub fn load_skills_with_config(_workspace: &Path, _config: &Config) -> Vec<Skill
     Vec::new()
 }
 
+/// Escape XML special characters.
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 /// Convert skills to a prompt section for the LLM.
 pub fn skills_to_prompt_with_mode(
     skills: &[Skill],
-    _workspace: &Path,
-    _mode: SkillsPromptInjectionMode,
+    workspace: &Path,
+    mode: SkillsPromptInjectionMode,
 ) -> String {
     if skills.is_empty() {
         return String::new();
     }
 
-    let mut prompt = String::from("\n\n## Available Skills\n\n");
+    let compact = matches!(mode, SkillsPromptInjectionMode::Compact);
+    let mut out = String::from("<available_skills>\n");
+
     for skill in skills {
-        prompt.push_str(&format!("### {}\n{}\n", skill.name, skill.description));
-        for tool in &skill.tools {
-            prompt.push_str(&format!("- Tool: {} — {}\n", tool.name, tool.description));
+        out.push_str("<skill>\n");
+        out.push_str(&format!("<name>{}</name>\n", xml_escape(&skill.name)));
+        out.push_str(&format!(
+            "<description>{}</description>\n",
+            xml_escape(&skill.description)
+        ));
+
+        if let Some(ref loc) = skill.location {
+            // Make location relative to workspace
+            let rel = Path::new(loc)
+                .strip_prefix(workspace)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| loc.clone());
+            out.push_str(&format!("<location>{}</location>\n", xml_escape(&rel)));
         }
-        prompt.push('\n');
+
+        if !compact {
+            for prompt in &skill.prompts {
+                out.push_str(&format!(
+                    "<instruction>{}</instruction>\n",
+                    xml_escape(prompt)
+                ));
+            }
+            if !skill.tools.is_empty() {
+                out.push_str("<tools>\n");
+                for tool in &skill.tools {
+                    out.push_str("<tool>\n");
+                    out.push_str(&format!("<name>{}</name>\n", xml_escape(&tool.name)));
+                    out.push_str(&format!(
+                        "<description>{}</description>\n",
+                        xml_escape(&tool.description)
+                    ));
+                    out.push_str(&format!("<kind>{}</kind>\n", xml_escape(&tool.kind)));
+                    out.push_str("</tool>\n");
+                }
+                out.push_str("</tools>\n");
+            }
+        }
+
+        out.push_str("</skill>\n");
     }
-    prompt
+
+    out.push_str("</available_skills>");
+    out
 }

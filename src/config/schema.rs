@@ -2896,10 +2896,7 @@ impl ChannelsConfig {
                 Box::new(ConfigWrapper::new(self.nextcloud_talk.as_ref())),
                 self.nextcloud_talk.is_some(),
             ),
-            (
-                Box::new(ConfigWrapper::new(self.email.as_ref())),
-                self.email.is_some(),
-            ),
+            // email channel removed in Augusta
             (
                 Box::new(ConfigWrapper::new(self.irc.as_ref())),
                 self.irc.is_some()
@@ -2925,10 +2922,7 @@ impl ChannelsConfig {
                 Box::new(ConfigWrapper::new(self.nostr.as_ref())),
                 self.nostr.is_some(),
             ),
-            (
-                Box::new(ConfigWrapper::new(self.clawdtalk.as_ref())),
-                self.clawdtalk.is_some(),
-            ),
+            // clawdtalk channel removed in Augusta
         ]
     }
 
@@ -2968,6 +2962,7 @@ impl Default for ChannelsConfig {
             feishu: None,
             dingtalk: None,
             qq: None,
+            #[cfg(feature = "channel-nostr")]
             #[cfg(feature = "channel-nostr")]
             nostr: None,
             clawdtalk: None,
@@ -4466,13 +4461,7 @@ impl Config {
                     "config.channels_config.nextcloud_talk.webhook_secret",
                 )?;
             }
-            if let Some(ref mut em) = config.channels_config.email {
-                decrypt_secret(
-                    &store,
-                    &mut em.password,
-                    "config.channels_config.email.password",
-                )?;
-            }
+            // email channel removed in Augusta
             if let Some(ref mut irc) = config.channels_config.irc {
                 decrypt_optional_secret(
                     &store,
@@ -4545,18 +4534,7 @@ impl Config {
                     "config.channels_config.webhook.secret",
                 )?;
             }
-            if let Some(ref mut ct) = config.channels_config.clawdtalk {
-                decrypt_secret(
-                    &store,
-                    &mut ct.api_key,
-                    "config.channels_config.clawdtalk.api_key",
-                )?;
-                decrypt_optional_secret(
-                    &store,
-                    &mut ct.webhook_secret,
-                    "config.channels_config.clawdtalk.webhook_secret",
-                )?;
-            }
+            // clawdtalk channel removed in Augusta
 
             // Decrypt gateway paired tokens
             for token in &mut config.gateway.paired_tokens {
@@ -5312,13 +5290,7 @@ impl Config {
                 "config.channels_config.nextcloud_talk.webhook_secret",
             )?;
         }
-        if let Some(ref mut em) = config_to_save.channels_config.email {
-            encrypt_secret(
-                &store,
-                &mut em.password,
-                "config.channels_config.email.password",
-            )?;
-        }
+        // email channel removed in Augusta
         if let Some(ref mut irc) = config_to_save.channels_config.irc {
             encrypt_optional_secret(
                 &store,
@@ -5391,18 +5363,7 @@ impl Config {
                 "config.channels_config.webhook.secret",
             )?;
         }
-        if let Some(ref mut ct) = config_to_save.channels_config.clawdtalk {
-            encrypt_secret(
-                &store,
-                &mut ct.api_key,
-                "config.channels_config.clawdtalk.api_key",
-            )?;
-            encrypt_optional_secret(
-                &store,
-                &mut ct.webhook_secret,
-                "config.channels_config.clawdtalk.webhook_secret",
-            )?;
-        }
+        // clawdtalk channel removed in Augusta
 
         // Encrypt gateway paired tokens
         for token in &mut config_to_save.gateway.paired_tokens {
@@ -6404,6 +6365,7 @@ allowed_users = ["@ops:matrix.org"]
             feishu: None,
             dingtalk: None,
             qq: None,
+            #[cfg(feature = "channel-nostr")]
             nostr: None,
             clawdtalk: None,
             message_timeout_secs: 300,
@@ -6618,6 +6580,7 @@ channel_id = "C123"
             feishu: None,
             dingtalk: None,
             qq: None,
+            #[cfg(feature = "channel-nostr")]
             nostr: None,
             clawdtalk: None,
             message_timeout_secs: 300,

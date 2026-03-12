@@ -283,6 +283,7 @@ async fn build_context(mem: &dyn Memory, user_msg: &str, min_relevance_score: f6
 /// Hardware RAG removed — Augusta doesn't use datasheet retrieval.
 #[allow(dead_code)]
 fn build_hardware_context(
+    _rag: &str,
     _user_msg: &str,
     _boards: &[String],
     _chunk_limit: usize,
@@ -2503,6 +2504,7 @@ pub(crate) async fn run_tool_call_loop(
                     let request = ApprovalRequest {
                         tool_name: tool_name.clone(),
                         arguments: tool_args.clone(),
+                        description: String::new(),
                     };
 
                     // Only prompt interactively on CLI; auto-approve on other channels.
@@ -2879,18 +2881,8 @@ pub async fn run(
         model: model_name.to_string(),
     });
 
-    // ── Hardware RAG (datasheet retrieval when peripherals + datasheet_dir) ──
-    let hardware_rag: Option<String> = config
-        .peripherals
-        .datasheet_dir
-        .as_ref()
-        .filter(|d| !d.trim().is_empty())
-        .map(|dir| String::load(&config.workspace_dir, dir.trim()))
-        .and_then(Result::ok)
-        .filter(|r: &String| !r.is_empty());
-    if let Some(ref rag) = hardware_rag {
-        tracing::info!(chunks = rag.len(), "Hardware RAG loaded");
-    }
+    // Hardware RAG removed in Augusta (no peripherals support)
+    let hardware_rag: Option<String> = None;
 
     let board_names: Vec<String> = config
         .peripherals
@@ -3345,20 +3337,9 @@ pub async fn process_message(config: Config, message: &str) -> Result<String> {
         &provider_runtime_options,
     )?;
 
-    let hardware_rag: Option<String> = config
-        .peripherals
-        .datasheet_dir
-        .as_ref()
-        .filter(|d| !d.trim().is_empty())
-        .map(|dir| String::load(&config.workspace_dir, dir.trim()))
-        .and_then(Result::ok)
-        .filter(|r: &String| !r.is_empty());
-    let board_names: Vec<String> = config
-        .peripherals
-        .boards
-        .iter()
-        .map(|b| b.board.clone())
-        .collect();
+    // Hardware RAG removed in Augusta (no peripherals support)
+    let hardware_rag: Option<String> = None;
+    let board_names: Vec<String> = Vec::new();
 
     let skills = crate::skills::load_skills_with_config(&config.workspace_dir, &config);
     let mut tool_descs: Vec<(&str, &str)> = vec![
@@ -3896,7 +3877,8 @@ mod tests {
         let approval_cfg = crate::config::AutonomyConfig::default();
         let approval_mgr = ApprovalManager::from_config(&approval_cfg);
 
-        assert!(!should_execute_tools_in_parallel(
+        // Augusta auto-approves everything, so parallel execution is allowed
+        assert!(should_execute_tools_in_parallel(
             &calls,
             Some(&approval_mgr)
         ));
@@ -5726,8 +5708,8 @@ Let me check the result."#;
             "Native prompt must list tool names"
         );
         assert!(
-            system_prompt.contains("## Your Task"),
-            "Native prompt should contain task instructions"
+            system_prompt.contains("## Available Tools"),
+            "Native prompt should contain available tools section"
         );
     }
 

@@ -25,7 +25,7 @@ pub mod runtime_trace {
         _provider: Option<&str>,
         _model: Option<&str>,
         _turn_id: Option<&str>,
-        _tool: Option<&str>,
+        _success: Option<bool>,
         _error: Option<&str>,
         _data: serde_json::Value,
     ) {

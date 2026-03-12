@@ -43,6 +43,7 @@ pub(crate) mod approval;
 pub(crate) mod auth;
 pub mod channels;
 pub mod config;
+pub(crate) mod hooks;
 pub(crate) mod identity;
 pub mod memory;
 pub(crate) mod migration;
@@ -51,7 +52,7 @@ pub mod observability;
 pub mod providers;
 pub mod runtime;
 pub(crate) mod skills;
-pub(crate) mod security;
+pub mod security;
 pub mod tools;
 pub(crate) mod util;
 

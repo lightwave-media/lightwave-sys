@@ -5,15 +5,19 @@
 //! channel (Redis Streams for Elixir orchestrator integration).
 
 pub mod cli;
+pub mod orchestrator;
 pub mod traits;
 
 pub use cli::CliChannel;
+pub use orchestrator::OrchestratorChannel;
 pub use traits::{Channel, ChannelMessage, SendMessage};
 
 use crate::agent::loop_::{build_tool_instructions, run_tool_call_loop, scrub_credentials};
+use crate::approval::ApprovalManager;
 use crate::config::Config;
 use crate::memory::{self, Memory};
-use crate::providers::{self, Provider};
+use crate::observability::{self, Observer};
+use crate::providers::{self, ChatMessage, Provider};
 use crate::runtime;
 use crate::security::SecurityPolicy;
 use crate::tools;
@@ -82,10 +86,14 @@ pub async fn start_cli(config: Config) -> Result<()> {
         &security,
         runtime,
         Arc::clone(&mem),
+        None,
+        None,
         &config.browser,
         &config.http_request,
         &config.web_fetch,
         &workspace,
+        &config.agents,
+        config.api_key.as_deref(),
         &config,
     ));
 
@@ -116,18 +124,36 @@ pub async fn start_cli(config: Config) -> Result<()> {
         }
     });
 
+    let observer = observability::create_observer(&config.observability);
+    let approval = ApprovalManager::from_config(&config.autonomy);
+
     // Process messages
     while let Some(msg) = rx.recv().await {
         info!("Processing message from {}", msg.sender);
 
+        let mut history = vec![
+            ChatMessage::system(&system_prompt),
+            ChatMessage::user(&msg.content),
+        ];
+
         let result = run_tool_call_loop(
             provider.as_ref(),
+            &mut history,
             tools_registry.as_ref(),
-            &system_prompt,
-            &msg.content,
+            &observer,
+            &provider_name,
             &model,
             temperature,
-            native_tools,
+            false,
+            Some(&approval),
+            "cli",
+            &config.multimodal,
+            config.agent.max_tool_iterations,
+            None,
+            None,
+            None,
+            &[],
+            &config.agent.tool_call_dedup_exempt,
         )
         .await;
 
