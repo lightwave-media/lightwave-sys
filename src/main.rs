@@ -160,10 +160,13 @@ async fn main() -> Result<()> {
             ChannelCommands::List => {
                 println!("Configured channels:");
                 println!("  - cli (always available)");
-                // TODO: list orchestrator channel if configured
+                println!("  - orchestrator (Redis Streams, requires --features orchestrator)");
             }
             ChannelCommands::Start => {
                 channels::start_cli(config).await?;
+            }
+            ChannelCommands::Orchestrator => {
+                channels::start_orchestrator(config).await?;
             }
         },
 

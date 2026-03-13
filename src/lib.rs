@@ -63,8 +63,10 @@ pub use config::Config;
 pub enum ChannelCommands {
     /// List all configured channels
     List,
-    /// Start all configured channels (handled in main.rs for async)
+    /// Start the CLI channel (interactive)
     Start,
+    /// Start the orchestrator channel (Redis Streams listener)
+    Orchestrator,
 }
 
 /// Memory management subcommands
