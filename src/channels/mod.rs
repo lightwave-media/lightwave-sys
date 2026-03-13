@@ -191,6 +191,14 @@ pub async fn start_orchestrator(config: Config) -> Result<()> {
                 system_prompt.to_string()
             };
 
+            // Use per-task model from orchestrator if provided, else default
+            let task_model = msg
+                .metadata
+                .get("model")
+                .filter(|m| !m.is_empty())
+                .cloned()
+                .unwrap_or_else(|| model.to_string());
+
             let mut history = vec![
                 ChatMessage::system(&effective_prompt),
                 ChatMessage::user(&msg.content),
@@ -207,7 +215,7 @@ pub async fn start_orchestrator(config: Config) -> Result<()> {
                 tools_registry.as_ref(),
                 obs_ref,
                 &provider_name,
-                &model,
+                &task_model,
                 temperature,
                 false,
                 Some(approval.as_ref()),

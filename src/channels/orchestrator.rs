@@ -44,6 +44,10 @@ pub struct OrchestratorTask {
     /// Prepended to the system prompt for workspace-aware execution.
     #[serde(default)]
     pub system_context: Option<String>,
+    /// Model override from orchestrator (e.g. "claude-haiku-4", "claude-opus-4").
+    /// When set, Augusta uses this model instead of its default.
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 fn default_timeout() -> u64 {
@@ -397,6 +401,9 @@ impl Channel for OrchestratorChannel {
                             if let Some(ctx) = task.system_context {
                                 metadata.insert("system_context".to_string(), ctx);
                             }
+                            if let Some(m) = task.model {
+                                metadata.insert("model".to_string(), m);
+                            }
 
                             let msg = ChannelMessage {
                                 id: task.run_id.clone(),
@@ -530,6 +537,7 @@ fn parse_stream_entries(entries: &[redis::Value]) -> Option<OrchestratorTask> {
         .unwrap_or_else(default_timeout);
 
     let system_context = map.get("system_context").cloned().filter(|s| !s.is_empty());
+    let model = map.get("model").cloned().filter(|s| !s.is_empty());
 
     Some(OrchestratorTask {
         run_id,
@@ -539,6 +547,7 @@ fn parse_stream_entries(entries: &[redis::Value]) -> Option<OrchestratorTask> {
         tools_allowed,
         timeout_ms,
         system_context,
+        model,
     })
 }
 
