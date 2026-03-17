@@ -43,6 +43,8 @@ pub(crate) mod approval;
 pub(crate) mod auth;
 pub mod channels;
 pub mod config;
+pub mod daemon;
+pub mod health;
 pub(crate) mod hooks;
 pub(crate) mod identity;
 pub mod memory;
@@ -54,6 +56,7 @@ pub mod runtime;
 pub mod security;
 pub(crate) mod skills;
 pub mod tools;
+pub mod tui;
 pub(crate) mod util;
 
 pub use config::Config;

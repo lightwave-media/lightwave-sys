@@ -38,6 +38,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 use lightwave_sys::channels;
 use lightwave_sys::config::Config;
+use lightwave_sys::daemon;
 use lightwave_sys::memory;
 use lightwave_sys::{ChannelCommands, MemoryCommands};
 
@@ -98,8 +99,68 @@ Examples:
         memory_command: MemoryCommands,
     },
 
+    /// Manage the background daemon
+    #[command(long_about = "\
+Manage the Augusta background daemon (launchd).
+
+The daemon provides persistent macOS integration: permission brokering,
+file system events, service registry, and health monitoring.
+
+Examples:
+  augusta daemon start       # start the daemon
+  augusta daemon stop        # stop the daemon
+  augusta daemon status      # check daemon status
+  augusta daemon install     # install launchd plist (auto-start on login)
+  augusta daemon uninstall   # remove launchd plist")]
+    Daemon {
+        #[command(subcommand)]
+        action: DaemonCommands,
+    },
+
+    /// Show the agent activity feed
+    #[command(long_about = "\
+Display real-time agent activity feed.
+
+Shows agent status, task progress, and system events.
+Use --plain for non-interactive output.
+
+Keybindings (TUI mode):
+  j/k   — scroll down/up
+  Tab   — cycle panels
+  1/2/3 — jump to panel
+  p     — toggle problems-only mode
+  q     — quit
+
+Examples:
+  augusta feed               # interactive TUI
+  augusta feed --plain       # plain text output
+  augusta feed --problems    # show problems only")]
+    Feed {
+        /// Plain text output (no TUI)
+        #[arg(long)]
+        plain: bool,
+        /// Show only problems (stuck agents, failures)
+        #[arg(long)]
+        problems: bool,
+    },
+
     /// Show version and system info
     Version,
+}
+
+/// Daemon management subcommands.
+#[derive(Subcommand, Debug)]
+enum DaemonCommands {
+    /// Start the daemon in the foreground
+    Start,
+    /// Stop a running daemon
+    Stop,
+    /// Show daemon status
+    Status,
+    /// Install launchd plist for auto-start on login
+    Install,
+    /// Remove launchd plist
+    Uninstall,
 }
 
 #[tokio::main]
@@ -203,6 +264,51 @@ async fn main() -> Result<()> {
                 // TODO: implement
             }
         },
+
+        Commands::Daemon { action } => match action {
+            DaemonCommands::Start => {
+                let config = daemon::DaemonConfig::default();
+                daemon::run_daemon(config).await?;
+            }
+            DaemonCommands::Stop => {
+                // Send SIGTERM to the daemon via its PID file
+                let status = daemon::daemon_status()?;
+                println!("{status}");
+                // TODO: send SIGTERM to PID
+            }
+            DaemonCommands::Status => {
+                let status = daemon::daemon_status()?;
+                println!("{status}");
+            }
+            DaemonCommands::Install => {
+                daemon::install_launchd()?;
+                println!("Augusta daemon installed for auto-start.");
+            }
+            DaemonCommands::Uninstall => {
+                daemon::uninstall_launchd()?;
+                println!("Augusta daemon uninstalled.");
+            }
+        },
+
+        Commands::Feed { plain, problems } => {
+            if plain {
+                // Plain text mode: print recent events
+                let app = lightwave_sys::tui::FeedApp::new(100);
+                let events: Vec<_> = app.events.iter().cloned().collect();
+                let output = lightwave_sys::tui::feed::render_plain(&events);
+                if output.is_empty() {
+                    println!("No events to display.");
+                } else {
+                    println!("{output}");
+                }
+            } else {
+                // TUI mode (requires ratatui — placeholder until dependency is added)
+                println!("TUI feed mode requires ratatui. Use --plain for now.");
+                if problems {
+                    println!("(problems-only mode)");
+                }
+            }
+        }
 
         Commands::Version => {
             println!("LightWave Augusta v{}", env!("CARGO_PKG_VERSION"));

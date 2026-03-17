@@ -1,3 +1,5 @@
+pub mod agents;
+pub mod roles;
 pub mod schema;
 pub mod traits;
 

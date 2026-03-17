@@ -4,6 +4,7 @@
 //! Augusta ships with the CLI channel (stdin/stdout) and the orchestrator
 //! channel (Redis Streams for Elixir orchestrator integration).
 
+pub mod claude_sdk;
 pub mod cli;
 pub mod orchestrator;
 pub mod traits;

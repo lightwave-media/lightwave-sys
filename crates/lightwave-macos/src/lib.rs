@@ -4,11 +4,16 @@
 //! Exports an `execute` function for action-based dispatch.
 //! The `Tool` trait wrapper lives in lightwave-sys to avoid cyclic deps.
 
+pub mod accessibility;
 pub mod app;
+pub mod applescript;
 pub mod clipboard;
+pub mod fsevents;
 pub mod input;
+pub mod keychain;
 pub mod permission;
 pub mod screen;
+pub mod spotlight;
 pub mod system;
 pub mod types;
 pub mod window;
@@ -40,7 +45,11 @@ pub fn parameters_schema() -> Value {
                     "app.list", "app.frontmost", "app.launch", "app.quit",
                     "clipboard.get", "clipboard.set",
                     "system.info", "system.battery",
-                    "permission.check"
+                    "permission.check",
+                    "accessibility.query", "accessibility.find_role", "accessibility.find_text",
+                    "keychain.get", "keychain.set", "keychain.delete", "keychain.list",
+                    "spotlight.search", "spotlight.recent",
+                    "applescript.run"
                 ]
             },
             "pid": {
@@ -205,11 +214,97 @@ fn execute_inner(args: &Value) -> Result<Value> {
             Ok(serde_json::to_value(status)?)
         }
 
+        // ── Accessibility actions ───────────────────
+        "accessibility.query" => {
+            let elements = accessibility::query_frontmost_app()?;
+            Ok(json!({ "elements": elements }))
+        }
+        "accessibility.find_role" => {
+            let role = args
+                .get("role")
+                .or_else(|| args.get("text"))
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("role required for accessibility.find_role"))?;
+            let elements = accessibility::find_elements_by_role(role)?;
+            Ok(json!({ "elements": elements }))
+        }
+        "accessibility.find_text" => {
+            let text = args
+                .get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("text required for accessibility.find_text"))?;
+            let elements = accessibility::find_elements_by_text(text)?;
+            Ok(json!({ "elements": elements }))
+        }
+
+        // ── Keychain actions ────────────────────────
+        "keychain.get" => {
+            let key = args
+                .get("key")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("key required for keychain.get"))?;
+            let value = keychain::get_credential(key)?;
+            Ok(json!({ "key": key, "found": value.is_some(), "value": value }))
+        }
+        "keychain.set" => {
+            let key = args
+                .get("key")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("key required for keychain.set"))?;
+            let value = args
+                .get("text")
+                .or_else(|| args.get("value"))
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("text/value required for keychain.set"))?;
+            keychain::store_credential(key, value)?;
+            Ok(json!({ "stored": true, "key": key }))
+        }
+        "keychain.delete" => {
+            let key = args
+                .get("key")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("key required for keychain.delete"))?;
+            keychain::delete_credential(key)?;
+            Ok(json!({ "deleted": true, "key": key }))
+        }
+        "keychain.list" => {
+            let keys = keychain::list_credentials()?;
+            Ok(json!({ "credentials": keys }))
+        }
+
+        // ── Spotlight actions ───────────────────────
+        "spotlight.search" => {
+            let query = args
+                .get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("text required for spotlight.search"))?;
+            let results = spotlight::search(query, 20)?;
+            Ok(json!({ "results": results }))
+        }
+        "spotlight.recent" => {
+            let seconds = args.get("seconds").and_then(|v| v.as_u64()).unwrap_or(3600);
+            let dir = args.get("text").and_then(|v| v.as_str());
+            let results = spotlight::search_recently_modified(seconds, dir)?;
+            Ok(json!({ "results": results }))
+        }
+
+        // ── AppleScript action ──────────────────────
+        "applescript.run" => {
+            let script = args
+                .get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("text required for applescript.run"))?;
+            let result = applescript::execute(script)?;
+            Ok(json!({ "result": result }))
+        }
+
         _ => anyhow::bail!(
             "Unknown action: '{}'. Use one of: window.list, window.focus, input.click, \
              input.move, input.type, input.key, screen.capture, screen.displays, app.list, \
              app.frontmost, app.launch, app.quit, clipboard.get, clipboard.set, system.info, \
-             system.battery, permission.check",
+             system.battery, permission.check, accessibility.query, accessibility.find_role, \
+             accessibility.find_text, keychain.get, keychain.set, keychain.delete, keychain.list, \
+             spotlight.search, spotlight.recent, applescript.run",
             action
         ),
     }
@@ -236,7 +331,7 @@ mod tests {
     fn parameters_schema_lists_all_actions() {
         let schema = parameters_schema();
         let actions = schema["properties"]["action"]["enum"].as_array().unwrap();
-        assert_eq!(actions.len(), 17);
+        assert_eq!(actions.len(), 28);
         assert!(actions.contains(&json!("window.list")));
         assert!(actions.contains(&json!("clipboard.set")));
         assert!(actions.contains(&json!("permission.check")));
