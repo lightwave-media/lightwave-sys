@@ -286,15 +286,17 @@ async fn main() -> Result<()> {
             println!("Runtime: native (macOS)");
             println!(
                 "Provider: {}",
-                config.default_provider.as_deref().unwrap_or("anthropic")
+                config.default_provider.as_deref().unwrap_or("openrouter")
             );
             println!(
                 "Model: {}",
                 config
                     .default_model
                     .as_deref()
-                    .unwrap_or("claude-sonnet-4-6")
+                    .unwrap_or("anthropic/claude-sonnet-4")
             );
+            println!("Memory: {}", config.memory.backend);
+            println!("Config: {}", config.config_path.display());
         }
     }
 

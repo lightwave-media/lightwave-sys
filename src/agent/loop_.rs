@@ -2956,6 +2956,12 @@ pub async fn run(
             "Execute actions on 1000+ apps via Composio (Gmail, Notion, GitHub, Slack, etc.). Use action='list' to discover, 'execute' to run (optionally with connected_account_id), 'connect' to OAuth.",
         ));
     }
+    if config.web_fetch.enabled {
+        tool_descs.push((
+            "web_fetch",
+            "Fetch a URL and return its content as plain text. Use when: reading web pages, documentation, APIs. Respects allowed/blocked domain lists.",
+        ));
+    }
     tool_descs.push((
         "schedule",
         "Manage scheduled tasks (create/list/get/cancel/pause/resume). Supports recurring cron and one-shot delays.",

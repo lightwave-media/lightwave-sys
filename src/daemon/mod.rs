@@ -23,15 +23,6 @@ impl Default for DaemonConfig {
     }
 }
 
-/// Daemon lifecycle actions.
-pub enum DaemonAction {
-    Start,
-    Stop,
-    Status,
-    Install,
-    Uninstall,
-}
-
 /// Daemon entry point — runs the main event loop.
 pub async fn run_daemon(config: DaemonConfig) -> Result<()> {
     // Ensure directories exist
