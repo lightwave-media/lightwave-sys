@@ -232,6 +232,28 @@ pub struct Config {
     /// Text-to-Speech configuration (`[tts]`).
     #[serde(default)]
     pub tts: TtsConfig,
+
+    /// createOS local-first sync configuration (`[createos]`).
+    #[serde(default)]
+    pub createos: CreateOSConfig,
+}
+
+/// createOS local-first pipeline configuration.
+///
+/// Controls PowerSync-backed SQLite sync for epics, sprints, tasks, and user stories.
+/// When `enabled = true` and the daemon starts, Augusta opens a local SQLite database
+/// and connects to the PowerSync service for bidirectional sync.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+pub struct CreateOSConfig {
+    /// Enable createOS local-first sync. Default: `false`.
+    #[serde(default)]
+    pub enabled: bool,
+    /// LightWave API base URL (e.g., "https://api.lightwave-media.ltd").
+    #[serde(default)]
+    pub api_base: String,
+    /// Tenant schema name for sync scoping (e.g., "lightwave_media").
+    #[serde(default)]
+    pub tenant: String,
 }
 
 /// Named provider profile definition compatible with Codex app-server style config.
@@ -3880,6 +3902,7 @@ impl Default for Config {
             query_classification: QueryClassificationConfig::default(),
             transcription: TranscriptionConfig::default(),
             tts: TtsConfig::default(),
+            createos: CreateOSConfig::default(),
         }
     }
 }
@@ -5811,6 +5834,7 @@ default_temperature = 0.7
             hardware: HardwareConfig::default(),
             transcription: TranscriptionConfig::default(),
             tts: TtsConfig::default(),
+            createos: CreateOSConfig::default(),
         };
 
         let toml_str = toml::to_string_pretty(&config).unwrap();
@@ -6007,6 +6031,7 @@ tool_dispatcher = "xml"
             hardware: HardwareConfig::default(),
             transcription: TranscriptionConfig::default(),
             tts: TtsConfig::default(),
+            createos: CreateOSConfig::default(),
         };
 
         config.save().await.unwrap();

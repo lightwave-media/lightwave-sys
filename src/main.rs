@@ -262,8 +262,8 @@ async fn main() -> Result<()> {
 
         Commands::Daemon { action } => match action {
             DaemonCommands::Start => {
-                let config = daemon::DaemonConfig::default();
-                daemon::run_daemon(config).await?;
+                let daemon_config = daemon::DaemonConfig::default();
+                daemon::run_daemon(daemon_config, Some(&config)).await?;
             }
             DaemonCommands::Stop => {
                 let result = daemon::daemon_stop()?;
