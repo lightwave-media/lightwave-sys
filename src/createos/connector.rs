@@ -86,38 +86,39 @@ impl CreateOsConnector {
     }
 }
 
+/// Helper to create a PowerSyncError from a string message via http_client::Error.
+fn sync_err(msg: impl std::fmt::Display) -> PowerSyncError {
+    PowerSyncError::from(http_client::Error::from_str(
+        http_client::http_types::StatusCode::InternalServerError,
+        msg.to_string(),
+    ))
+}
+
 #[async_trait]
 impl BackendConnector for CreateOsConnector {
     async fn fetch_credentials(&self) -> Result<PowerSyncCredentials, PowerSyncError> {
         let resp = self
             .http
-            .post(&self.token_url())
+            .post(self.token_url())
             .headers(self.auth_headers())
             .json(&serde_json::json!({
                 "device_id": self.config.device_id,
             }))
             .send()
             .await
-            .map_err(|e| {
-                PowerSyncError::from(std::io::Error::new(
-                    std::io::ErrorKind::ConnectionRefused,
-                    format!("Token request failed: {e}"),
-                ))
-            })?;
+            .map_err(|e| sync_err(format!("Token request failed: {e}")))?;
 
         if !resp.status().is_success() {
-            return Err(PowerSyncError::from(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                format!("Token endpoint returned {}", resp.status()),
+            return Err(sync_err(format!(
+                "Token endpoint returned {}",
+                resp.status()
             )));
         }
 
-        let token_resp: TokenResponse = resp.json().await.map_err(|e| {
-            PowerSyncError::from(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Token parse failed: {e}"),
-            ))
-        })?;
+        let token_resp: TokenResponse = resp
+            .json()
+            .await
+            .map_err(|e| sync_err(format!("Token parse failed: {e}")))?;
 
         Ok(PowerSyncCredentials {
             endpoint: token_resp.endpoint,
@@ -151,17 +152,12 @@ impl BackendConnector for CreateOsConnector {
 
             let resp = self
                 .http
-                .post(&self.upload_url())
+                .post(self.upload_url())
                 .headers(self.auth_headers())
                 .json(&batch)
                 .send()
                 .await
-                .map_err(|e| {
-                    PowerSyncError::from(std::io::Error::new(
-                        std::io::ErrorKind::ConnectionRefused,
-                        format!("Upload request failed: {e}"),
-                    ))
-                })?;
+                .map_err(|e| sync_err(format!("Upload request failed: {e}")))?;
 
             if !resp.status().is_success() {
                 tracing::warn!(

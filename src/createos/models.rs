@@ -1,4 +1,3 @@
-use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -126,8 +125,8 @@ pub struct LifeDomain {
     pub color: String,
     pub is_active: bool,
     pub notion_id: String,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,8 +146,8 @@ pub struct Epic {
     pub estimated_budget: Option<f64>,
     pub client: String,
     pub production_company: String,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -163,8 +162,8 @@ pub struct Sprint {
     pub end_date: Option<String>,
     pub quality_score: Option<f64>,
     pub notion_id: String,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,8 +190,8 @@ pub struct Task {
     pub ai_summary: String,
     pub note: String,
     pub notion_id: String,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,6 +223,6 @@ pub struct UserStory {
     /// JSON stored as text in SQLite
     pub rbac_requirements: String,
     pub research_notes: String,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: String,
+    pub updated_at: String,
 }

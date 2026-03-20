@@ -69,37 +69,35 @@ pub async fn handle_command(cmd: CreateOsCommands, workspace_dir: &std::path::Pa
                 .await
                 .map_err(|e| anyhow::anyhow!("Reader failed: {e}"))?;
 
-            let epics = reader
-                .query(move |conn| {
-                    let mut sql =
-                        String::from("SELECT id, name, status, priority FROM createos_epic");
-                    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+            let mut sql = String::from("SELECT id, name, status, priority FROM createos_epic");
+            let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
 
-                    if let Some(ref s) = status {
-                        sql.push_str(" WHERE status = ?");
-                        params.push(Box::new(s.clone()));
-                    }
-                    sql.push_str(" ORDER BY created_at DESC");
+            if let Some(ref s) = status {
+                sql.push_str(" WHERE status = ?");
+                params.push(Box::new(s.clone()));
+            }
+            sql.push_str(" ORDER BY created_at DESC");
 
-                    let param_refs: Vec<&dyn rusqlite::types::ToSql> =
-                        params.iter().map(|p| p.as_ref()).collect();
-                    let mut stmt = conn.prepare(&sql)?;
-                    let rows = stmt.query_map(param_refs.as_slice(), |row| {
-                        Ok((
-                            row.get::<_, String>(0)?,
-                            row.get::<_, String>(1)?,
-                            row.get::<_, String>(2)?,
-                            row.get::<_, String>(3)?,
-                        ))
-                    })?;
-
-                    let mut result = Vec::new();
-                    for row in rows {
-                        result.push(row?);
-                    }
-                    Ok(result)
+            let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+                params.iter().map(|p| p.as_ref()).collect();
+            let mut stmt = reader
+                .prepare(&sql)
+                .map_err(|e| anyhow::anyhow!("Prepare failed: {e}"))?;
+            let rows = stmt
+                .query_map(param_refs.as_slice(), |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                    ))
                 })
                 .map_err(|e| anyhow::anyhow!("Epic query failed: {e}"))?;
+
+            let mut epics = Vec::new();
+            for row in rows {
+                epics.push(row.map_err(|e| anyhow::anyhow!("Row parse error: {e}"))?);
+            }
 
             if epics.is_empty() {
                 println!("No epics found.");
@@ -130,39 +128,37 @@ pub async fn handle_command(cmd: CreateOsCommands, workspace_dir: &std::path::Pa
                 .await
                 .map_err(|e| anyhow::anyhow!("Reader failed: {e}"))?;
 
-            let sprints = reader
-                .query(move |conn| {
-                    let mut sql = String::from(
-                        "SELECT id, name, status, start_date, end_date FROM createos_sprint",
-                    );
-                    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+            let mut sql =
+                String::from("SELECT id, name, status, start_date, end_date FROM createos_sprint");
+            let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
 
-                    if let Some(ref s) = status {
-                        sql.push_str(" WHERE status = ?");
-                        params.push(Box::new(s.clone()));
-                    }
-                    sql.push_str(" ORDER BY start_date DESC NULLS LAST");
+            if let Some(ref s) = status {
+                sql.push_str(" WHERE status = ?");
+                params.push(Box::new(s.clone()));
+            }
+            sql.push_str(" ORDER BY start_date DESC NULLS LAST");
 
-                    let param_refs: Vec<&dyn rusqlite::types::ToSql> =
-                        params.iter().map(|p| p.as_ref()).collect();
-                    let mut stmt = conn.prepare(&sql)?;
-                    let rows = stmt.query_map(param_refs.as_slice(), |row| {
-                        Ok((
-                            row.get::<_, String>(0)?,
-                            row.get::<_, String>(1)?,
-                            row.get::<_, String>(2)?,
-                            row.get::<_, Option<String>>(3)?,
-                            row.get::<_, Option<String>>(4)?,
-                        ))
-                    })?;
-
-                    let mut result = Vec::new();
-                    for row in rows {
-                        result.push(row?);
-                    }
-                    Ok(result)
+            let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+                params.iter().map(|p| p.as_ref()).collect();
+            let mut stmt = reader
+                .prepare(&sql)
+                .map_err(|e| anyhow::anyhow!("Prepare failed: {e}"))?;
+            let rows = stmt
+                .query_map(param_refs.as_slice(), |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                        row.get::<_, Option<String>>(4)?,
+                    ))
                 })
                 .map_err(|e| anyhow::anyhow!("Sprint query failed: {e}"))?;
+
+            let mut sprints = Vec::new();
+            for row in rows {
+                sprints.push(row.map_err(|e| anyhow::anyhow!("Row parse error: {e}"))?);
+            }
 
             if sprints.is_empty() {
                 println!("No sprints found.");
@@ -191,17 +187,16 @@ pub async fn handle_command(cmd: CreateOsCommands, workspace_dir: &std::path::Pa
             let status = db.sync_status();
             println!("createOS Sync Status");
             println!("  Database: {}", db.db_path().display());
-            println!("  Connected: {}", status.connected);
-            println!(
-                "  Last synced: {}",
-                if status.last_synced_at.is_some() {
-                    "yes"
-                } else {
-                    "never"
-                }
-            );
-            println!("  Uploading: {}", status.uploading);
-            println!("  Downloading: {}", status.downloading);
+            println!("  Connected: {}", status.is_connected());
+            println!("  Connecting: {}", status.is_connecting());
+            println!("  Uploading: {}", status.is_uploading());
+            println!("  Downloading: {}", status.is_downloading());
+            if let Some(err) = status.download_error() {
+                println!("  Download error: {err}");
+            }
+            if let Some(err) = status.upload_error() {
+                println!("  Upload error: {err}");
+            }
         }
     }
 

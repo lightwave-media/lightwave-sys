@@ -63,8 +63,7 @@ impl CreateOsDb {
 
         // Start async tasks (download + upload actors)
         let tasks = self.db.async_tasks();
-        tokio::spawn(tasks.uploads);
-        tokio::spawn(tasks.downloads);
+        tasks.spawn_with(|future| tokio::spawn(future));
 
         let options = SyncOptions::new(connector);
         self.db.connect(options).await;
@@ -186,106 +185,76 @@ impl ReqwestHttpClient {
     }
 }
 
+#[http_client::async_trait]
 impl http_client::HttpClient for ReqwestHttpClient {
-    fn send(
+    async fn send(
         &self,
-        req: http_client::http_types::Request,
-    ) -> std::pin::Pin<
-        Box<
-            dyn std::future::Future<
-                    Output = Result<http_client::http_types::Response, http_client::Error>,
-                > + Send,
-        >,
-    > {
-        let client = self.client.clone();
+        mut req: http_client::Request,
+    ) -> Result<http_client::Response, http_client::Error> {
+        let url = req.url().to_string();
+        let method = match req.method() {
+            http_client::http_types::Method::Post => reqwest::Method::POST,
+            http_client::http_types::Method::Put => reqwest::Method::PUT,
+            http_client::http_types::Method::Delete => reqwest::Method::DELETE,
+            http_client::http_types::Method::Patch => reqwest::Method::PATCH,
+            http_client::http_types::Method::Head => reqwest::Method::HEAD,
+            http_client::http_types::Method::Options => reqwest::Method::OPTIONS,
+            _ => reqwest::Method::GET,
+        };
 
-        Box::pin(async move {
-            let url = req.url().to_string();
-            let method = match req.method() {
-                http_client::http_types::Method::Get => reqwest::Method::GET,
-                http_client::http_types::Method::Post => reqwest::Method::POST,
-                http_client::http_types::Method::Put => reqwest::Method::PUT,
-                http_client::http_types::Method::Delete => reqwest::Method::DELETE,
-                http_client::http_types::Method::Patch => reqwest::Method::PATCH,
-                http_client::http_types::Method::Head => reqwest::Method::HEAD,
-                http_client::http_types::Method::Options => reqwest::Method::OPTIONS,
-                _ => reqwest::Method::GET,
-            };
+        let mut builder = self.client.request(method, &url);
 
-            let mut builder = client.request(method, &url);
-
-            // Copy headers
-            for (name, values) in req.iter() {
-                for value in values.iter() {
-                    builder = builder.header(name.as_str(), value.as_str());
-                }
+        // Copy headers
+        for (name, values) in &req {
+            for value in values {
+                builder = builder.header(name.as_str(), value.as_str());
             }
+        }
 
-            // Copy body
-            let body_bytes = req.into();
-            let body: http_client::http_types::Body = body_bytes;
-            let bytes = body.into_bytes().await.map_err(|e| {
-                http_client::Error::from_str(
-                    http_client::http_types::StatusCode::InternalServerError,
-                    format!("Failed to read request body: {e}"),
-                )
-            })?;
-            if !bytes.is_empty() {
-                builder = builder.body(bytes.to_vec());
+        // Copy body
+        let body = req.take_body();
+        let bytes = body.into_bytes().await.map_err(|e| {
+            http_client::Error::from_str(
+                http_client::http_types::StatusCode::InternalServerError,
+                format!("Failed to read request body: {e}"),
+            )
+        })?;
+        if !bytes.is_empty() {
+            builder = builder.body(bytes.to_vec());
+        }
+
+        let resp = builder.send().await.map_err(|e| {
+            http_client::Error::from_str(
+                http_client::http_types::StatusCode::InternalServerError,
+                format!("HTTP request failed: {e}"),
+            )
+        })?;
+
+        let status_code = resp.status().as_u16();
+        let status = http_client::http_types::StatusCode::try_from(status_code).map_err(|e| {
+            http_client::Error::from_str(
+                http_client::http_types::StatusCode::InternalServerError,
+                format!("Invalid status code: {e}"),
+            )
+        })?;
+
+        let mut http_resp = http_client::Response::new(status);
+
+        // Copy response headers
+        for (key, value) in resp.headers() {
+            if let Ok(val) = value.to_str() {
+                http_resp.append_header(key.as_str(), val);
             }
+        }
 
-            let resp = builder.send().await.map_err(|e| {
-                http_client::Error::from_str(
-                    http_client::http_types::StatusCode::InternalServerError,
-                    format!("HTTP request failed: {e}"),
-                )
-            })?;
+        let body_bytes = resp.bytes().await.map_err(|e| {
+            http_client::Error::from_str(
+                http_client::http_types::StatusCode::InternalServerError,
+                format!("Failed to read response body: {e}"),
+            )
+        })?;
+        http_resp.set_body(body_bytes.as_ref());
 
-            let status_code = resp.status().as_u16();
-            let status =
-                http_client::http_types::StatusCode::try_from(status_code).map_err(|e| {
-                    http_client::Error::from_str(
-                        http_client::http_types::StatusCode::InternalServerError,
-                        format!("Invalid status code: {e}"),
-                    )
-                })?;
-
-            let mut http_resp = http_client::http_types::Response::new(status);
-
-            // Copy response headers
-            for (key, value) in resp.headers() {
-                if let Ok(val) = value.to_str() {
-                    let name = http_client::http_types::headers::HeaderName::from_bytes(
-                        key.as_str().as_bytes().to_vec(),
-                    )
-                    .map_err(|e| {
-                        http_client::Error::from_str(
-                            http_client::http_types::StatusCode::InternalServerError,
-                            format!("Invalid header name: {e}"),
-                        )
-                    })?;
-                    let header_val = http_client::http_types::headers::HeaderValue::from_bytes(
-                        val.as_bytes().to_vec(),
-                    )
-                    .map_err(|e| {
-                        http_client::Error::from_str(
-                            http_client::http_types::StatusCode::InternalServerError,
-                            format!("Invalid header value: {e}"),
-                        )
-                    })?;
-                    http_resp.insert_header(name, header_val);
-                }
-            }
-
-            let body_bytes = resp.bytes().await.map_err(|e| {
-                http_client::Error::from_str(
-                    http_client::http_types::StatusCode::InternalServerError,
-                    format!("Failed to read response body: {e}"),
-                )
-            })?;
-            http_resp.set_body(body_bytes.as_ref());
-
-            Ok(http_resp)
-        })
+        Ok(http_resp)
     }
 }
