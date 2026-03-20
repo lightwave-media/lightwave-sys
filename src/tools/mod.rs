@@ -21,6 +21,7 @@ pub mod screenshot;
 pub mod shell;
 pub mod traits;
 pub mod web_fetch;
+pub mod web_search;
 
 pub use browser::{BrowserTool, ComputerUseConfig};
 pub use browser_open::BrowserOpenTool;
@@ -43,6 +44,7 @@ pub use traits::Tool;
 #[allow(unused_imports)]
 pub use traits::{ToolResult, ToolSpec};
 pub use web_fetch::WebFetchTool;
+pub use web_search::WebSearchTool;
 
 use crate::config::Config;
 use crate::memory::Memory;
@@ -114,6 +116,7 @@ pub fn all_tools(
     browser_config: &crate::config::BrowserConfig,
     http_config: &crate::config::HttpRequestConfig,
     web_fetch_config: &crate::config::WebFetchConfig,
+    web_search_config: &crate::config::WebSearchConfig,
     workspace_dir: &std::path::Path,
     root_config: &crate::config::Config,
 ) -> Vec<Box<dyn Tool>> {
@@ -127,6 +130,7 @@ pub fn all_tools(
         browser_config,
         http_config,
         web_fetch_config,
+        web_search_config,
         workspace_dir,
         &std::collections::HashMap::new(),
         None,
@@ -150,6 +154,7 @@ pub fn all_tools_with_runtime(
     browser_config: &crate::config::BrowserConfig,
     http_config: &crate::config::HttpRequestConfig,
     web_fetch_config: &crate::config::WebFetchConfig,
+    web_search_config: &crate::config::WebSearchConfig,
     workspace_dir: &std::path::Path,
     _agents_config: &std::collections::HashMap<String, crate::config::DelegateAgentConfig>,
     _api_key: Option<&str>,
@@ -212,6 +217,16 @@ pub fn all_tools_with_runtime(
             web_fetch_config.blocked_domains.clone(),
             web_fetch_config.max_response_size,
             web_fetch_config.timeout_secs,
+        )));
+    }
+
+    if web_search_config.enabled {
+        tool_arcs.push(Arc::new(WebSearchTool::new(
+            security.clone(),
+            web_search_config.provider.clone(),
+            web_search_config.brave_api_key.clone(),
+            web_search_config.max_results,
+            web_search_config.timeout_secs,
         )));
     }
 

@@ -44,6 +44,7 @@ pub(crate) mod auth;
 pub mod channels;
 pub mod config;
 pub mod daemon;
+pub mod gateway;
 pub mod health;
 pub(crate) mod hooks;
 pub(crate) mod identity;

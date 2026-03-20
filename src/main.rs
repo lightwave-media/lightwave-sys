@@ -263,7 +263,6 @@ async fn main() -> Result<()> {
 
         Commands::Feed { plain, problems } => {
             if plain {
-                // Plain text mode: print recent events
                 let app = lightwave_sys::tui::FeedApp::new(100);
                 let events: Vec<_> = app.events.iter().cloned().collect();
                 let output = lightwave_sys::tui::feed::render_plain(&events);
@@ -273,11 +272,7 @@ async fn main() -> Result<()> {
                     println!("{output}");
                 }
             } else {
-                // TUI mode (requires ratatui — placeholder until dependency is added)
-                println!("TUI feed mode requires ratatui. Use --plain for now.");
-                if problems {
-                    println!("(problems-only mode)");
-                }
+                lightwave_sys::tui::tui_render::run_tui(problems)?;
             }
         }
 

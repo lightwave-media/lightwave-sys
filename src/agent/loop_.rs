@@ -2833,6 +2833,7 @@ pub async fn run(
         &config.browser,
         &config.http_request,
         &config.web_fetch,
+        &config.web_search,
         &config.workspace_dir,
         &config.agents,
         config.api_key.as_deref(),
@@ -2960,6 +2961,12 @@ pub async fn run(
         tool_descs.push((
             "web_fetch",
             "Fetch a URL and return its content as plain text. Use when: reading web pages, documentation, APIs. Respects allowed/blocked domain lists.",
+        ));
+    }
+    if config.web_search.enabled {
+        tool_descs.push((
+            "web_search",
+            "Search the web and return results with titles, URLs, and snippets. Use for finding current information, documentation, or answers.",
         ));
     }
     tool_descs.push((
@@ -3310,6 +3317,7 @@ pub async fn process_message(config: Config, message: &str) -> Result<String> {
         &config.browser,
         &config.http_request,
         &config.web_fetch,
+        &config.web_search,
         &config.workspace_dir,
         &config.agents,
         config.api_key.as_deref(),
