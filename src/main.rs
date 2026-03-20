@@ -263,8 +263,13 @@ async fn main() -> Result<()> {
 
         Commands::Feed { plain, problems } => {
             if plain {
-                let app = lightwave_sys::tui::FeedApp::new(100);
-                let events: Vec<_> = app.events.iter().cloned().collect();
+                let mut app = lightwave_sys::tui::FeedApp::new(100);
+                let event_log = lightwave_sys::tui::event_bus::default_event_log_path();
+                let _ = lightwave_sys::tui::event_bus::load_events(&event_log, &mut app);
+                if problems {
+                    app.toggle_problems();
+                }
+                let events: Vec<_> = app.visible_events().into_iter().cloned().collect();
                 let output = lightwave_sys::tui::feed::render_plain(&events);
                 if output.is_empty() {
                     println!("No events to display.");

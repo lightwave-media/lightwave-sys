@@ -12,6 +12,15 @@ use std::time::Duration;
 pub fn run_tui(problems_mode: bool) -> io::Result<()> {
     let mut terminal = ratatui::init();
     let mut app = FeedApp::new(1000);
+
+    // Load persisted events from disk
+    let event_log = super::event_bus::default_event_log_path();
+    match super::event_bus::load_events(&event_log, &mut app) {
+        Ok(n) if n > 0 => tracing::info!("Loaded {n} events from {}", event_log.display()),
+        Ok(_) => {}
+        Err(e) => tracing::warn!("Failed to load events: {e}"),
+    }
+
     if problems_mode {
         app.toggle_problems();
     }

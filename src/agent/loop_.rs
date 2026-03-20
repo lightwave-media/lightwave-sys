@@ -2881,6 +2881,13 @@ pub async fn run(
         model: model_name.to_string(),
     });
 
+    crate::tui::event_bus::emit(
+        "augusta",
+        "agent",
+        "agent_started",
+        &format!("Session started ({provider_name}/{model_name})"),
+    );
+
     // Hardware RAG removed in Augusta (no peripherals support)
     let hardware_rag: Option<String> = None;
 
@@ -3277,6 +3284,13 @@ pub async fn run(
         tokens_used: None,
         cost_usd: None,
     });
+
+    crate::tui::event_bus::emit(
+        "augusta",
+        "agent",
+        "agent_stopped",
+        &format!("Session ended ({duration:?})"),
+    );
 
     Ok(final_output)
 }

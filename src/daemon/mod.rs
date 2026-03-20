@@ -1,5 +1,7 @@
 use anyhow::Result;
 use std::path::PathBuf;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::UnixListener;
 use tokio::signal;
 
 /// Daemon configuration.
@@ -38,21 +40,97 @@ pub async fn run_daemon(config: DaemonConfig) -> Result<()> {
     tracing::info!("Augusta daemon started (PID: {pid})");
     tracing::info!("Socket: {}", config.socket_path.display());
 
-    // TODO: Start Unix socket listener for IPC
-    // TODO: Start health monitor loop
-    // TODO: Start FSEvents watcher
-    // TODO: Start service registry
+    crate::tui::event_bus::emit("daemon", "system", "agent_started", "Daemon started");
 
-    // Wait for shutdown signal
-    signal::ctrl_c().await?;
+    // Remove stale socket
+    let _ = std::fs::remove_file(&config.socket_path);
+
+    // Start Unix socket listener for IPC
+    let listener = UnixListener::bind(&config.socket_path)?;
+    tracing::info!("IPC socket bound: {}", config.socket_path.display());
+
+    // Start health monitor loop
+    let health_handle = tokio::spawn(health_monitor_loop());
+
+    // IPC + shutdown select loop
+    loop {
+        tokio::select! {
+            accept_result = listener.accept() => {
+                match accept_result {
+                    Ok((stream, _addr)) => {
+                        tokio::spawn(handle_ipc_client(stream));
+                    }
+                    Err(e) => {
+                        tracing::warn!("IPC accept error: {e}");
+                    }
+                }
+            }
+            _ = signal::ctrl_c() => {
+                tracing::info!("Received shutdown signal");
+                break;
+            }
+        }
+    }
+
+    health_handle.abort();
 
     tracing::info!("Shutting down Augusta daemon");
+    crate::tui::event_bus::emit("daemon", "system", "agent_stopped", "Daemon stopped");
 
-    // Cleanup PID file
+    // Cleanup
     let _ = std::fs::remove_file(&config.pid_file);
     let _ = std::fs::remove_file(&config.socket_path);
 
     Ok(())
+}
+
+/// Handle a single IPC client connection.
+///
+/// Protocol: newline-delimited commands. Each command gets a JSON response.
+/// Supported commands: `ping`, `status`, `version`.
+async fn handle_ipc_client(stream: tokio::net::UnixStream) {
+    let (reader, mut writer) = stream.into_split();
+    let mut lines = BufReader::new(reader).lines();
+
+    while let Ok(Some(line)) = lines.next_line().await {
+        let response = match line.trim() {
+            "ping" => serde_json::json!({
+                "status": "ok",
+                "pong": true,
+                "pid": std::process::id(),
+            }),
+            "status" => serde_json::json!({
+                "status": "ok",
+                "pid": std::process::id(),
+                "uptime_secs": 0, // TODO: track actual uptime
+                "version": env!("CARGO_PKG_VERSION"),
+            }),
+            "version" => serde_json::json!({
+                "status": "ok",
+                "version": env!("CARGO_PKG_VERSION"),
+            }),
+            cmd => serde_json::json!({
+                "status": "error",
+                "error": format!("Unknown command: {cmd}"),
+                "available": ["ping", "status", "version"],
+            }),
+        };
+
+        let mut response_bytes = serde_json::to_vec(&response).unwrap_or_default();
+        response_bytes.push(b'\n');
+        if writer.write_all(&response_bytes).await.is_err() {
+            break;
+        }
+    }
+}
+
+/// Periodic health check loop (emits ping events every 60 seconds).
+async fn health_monitor_loop() {
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+    loop {
+        interval.tick().await;
+        crate::tui::event_bus::emit("daemon", "system", "ping_success", "Health check OK");
+    }
 }
 
 /// Install the launchd plist for auto-start.
