@@ -259,11 +259,9 @@ pub async fn start_orchestrator(config: Config) -> Result<()> {
 /// Start the iMessage channel — polls macOS Messages chat.db for incoming
 /// messages and sends replies via AppleScript. Requires Full Disk Access.
 pub async fn start_imessage(config: Config) -> Result<()> {
-    let imessage_config = config
-        .channels_config
-        .imessage
-        .clone()
-        .ok_or_else(|| anyhow::anyhow!("iMessage channel not configured (channels_config.imessage)"))?;
+    let imessage_config = config.channels_config.imessage.clone().ok_or_else(|| {
+        anyhow::anyhow!("iMessage channel not configured (channels_config.imessage)")
+    })?;
 
     let provider_name = resolved_default_provider(&config);
     let provider_runtime_options = providers::ProviderRuntimeOptions {

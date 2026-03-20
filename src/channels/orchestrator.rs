@@ -157,7 +157,7 @@ impl crate::observability::Observer for StreamingObserver {
                 serde_json::json!({
                     "type": "tool_end",
                     "tool": tool,
-                    "duration_ms": duration.as_millis() as u64,
+                    "duration_ms": u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
                     "success": success,
                 })
             }
@@ -169,7 +169,7 @@ impl crate::observability::Observer for StreamingObserver {
             } => {
                 serde_json::json!({
                     "type": "llm_response",
-                    "duration_ms": duration.as_millis() as u64,
+                    "duration_ms": u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
                     "success": success,
                 })
             }
@@ -492,8 +492,8 @@ impl Channel for OrchestratorChannel {
 /// Returns `Some(json_response)` if the message was a brain message,
 /// `None` if it should be processed as a normal agent task.
 #[cfg(feature = "orchestrator")]
-pub async fn handle_brain_message(
-    fields: &std::collections::HashMap<String, String>,
+pub async fn handle_brain_message<S: ::std::hash::BuildHasher>(
+    fields: &std::collections::HashMap<String, String, S>,
 ) -> Option<String> {
     let msg_type = fields.get("type")?;
 
@@ -794,8 +794,6 @@ pub async fn publish_to_inbox(
 
     // Wait for response on augusta:results:{message_id}
     let result_stream = format!("{INBOX_RESULTS_PREFIX}:{message_id}");
-    let redix_timeout = timeout_ms + 5_000;
-
     let result: redis::RedisResult<Vec<redis::Value>> = redis::cmd("XREAD")
         .arg("BLOCK")
         .arg(timeout_ms.to_string())
@@ -838,7 +836,8 @@ pub async fn orchestrator_reachable(redis_url: &str) -> bool {
     };
     match client.get_multiplexed_async_connection().await {
         Ok(mut conn) => {
-            let result: redis::RedisResult<String> = redis::cmd("PING").query_async(&mut conn).await;
+            let result: redis::RedisResult<String> =
+                redis::cmd("PING").query_async(&mut conn).await;
             result.is_ok()
         }
         Err(_) => false,

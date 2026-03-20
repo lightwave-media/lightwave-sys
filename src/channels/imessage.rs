@@ -8,7 +8,7 @@ use super::traits::{Channel, ChannelMessage, SendMessage};
 use crate::config::schema::IMessageConfig;
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -67,7 +67,10 @@ impl IMessageChannel {
             } else {
                 // Phone: strip non-digit chars for comparison
                 let c_digits: String = c.chars().filter(|ch| ch.is_ascii_digit()).collect();
-                let s_digits: String = normalized.chars().filter(|ch| ch.is_ascii_digit()).collect();
+                let s_digits: String = normalized
+                    .chars()
+                    .filter(|ch| ch.is_ascii_digit())
+                    .collect();
                 // Match on last 10 digits (handles +1 prefix vs no prefix)
                 let c_tail = if c_digits.len() >= 10 {
                     &c_digits[c_digits.len() - 10..]
@@ -109,12 +112,7 @@ impl Channel for IMessageChannel {
             .replace('"', "\\\"")
             .replace('\n', "\\n");
 
-        // Determine if recipient is phone or email to use correct service
-        let service = if recipient.contains('@') {
-            "iMessage"
-        } else {
-            "iMessage"
-        };
+        let service = "iMessage";
 
         let script = format!(
             r#"tell application "Messages"
@@ -146,10 +144,7 @@ end tell"#,
         info!("  Database: {}", db_path.display());
         info!("  Poll interval: {}s", poll_interval.as_secs());
         info!("  Allowed contacts: {}", allowed_contacts.len());
-        info!(
-            "  Cursor: ROWID > {}",
-            last_rowid.load(Ordering::Relaxed)
-        );
+        info!("  Cursor: ROWID > {}", last_rowid.load(Ordering::Relaxed));
 
         loop {
             let current_rowid = last_rowid.load(Ordering::Relaxed);
@@ -214,9 +209,7 @@ end tell"#,
                         .is_ok()
                 }
                 Err(e) => {
-                    warn!(
-                        "iMessage health check failed (Full Disk Access required?): {e}"
-                    );
+                    warn!("iMessage health check failed (Full Disk Access required?): {e}");
                     false
                 }
             }
@@ -229,16 +222,15 @@ end tell"#,
 /// Poll chat.db for messages with ROWID > last_seen where is_from_me = 0.
 /// Returns Vec<(rowid, sender_id, text, timestamp)>.
 async fn poll_new_messages(
-    db_path: &PathBuf,
+    db_path: &Path,
     last_rowid: i64,
 ) -> anyhow::Result<Vec<(i64, String, String, u64)>> {
-    let db_path = db_path.clone();
+    let db_path = db_path.to_path_buf();
 
     tokio::task::spawn_blocking(move || {
         let conn = rusqlite::Connection::open_with_flags(
             &db_path,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
-                | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )?;
 
         // chat.db schema: message table has ROWID, text, handle_id, is_from_me, date
